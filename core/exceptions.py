@@ -5,3 +5,7 @@ class BasicException(Exception):
 
 class ConfigError(BasicException):
     pass
+
+
+class HdfsError(BaseException):
+    pass

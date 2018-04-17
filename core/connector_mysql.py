@@ -1,7 +1,11 @@
-import os
-import shutil
+import json
 import MySQLdb
 from core.connector_base import BaseConnector
+from core.hdfs_db import HdfsDb
+
+
+def json_to_string(data):
+    return json.dumps(data.decode('utf-8'))
 
 
 class MysqlConnector(BaseConnector):
@@ -10,6 +14,10 @@ class MysqlConnector(BaseConnector):
         'export_table': (
             'SELECT * FROM {table} INTO OUTFILE "{filename}"',
             '导出表数据到文件'
+        ),
+        'select_table': (
+            'SELECT * FROM {table}',
+            '搜索表数据'
         )
     }
 
@@ -77,22 +85,23 @@ class MysqlConnector(BaseConnector):
         导出数据
         :return:
         """
-        tmp_folder = '/tmp'
-        folder = getattr(self.commands, 'folder', '/tmp')
+        hd = HdfsDb()
+        filedata = hd.read_file('t1.json', dir_path='/data')
+
         tables = self.show_tables()
         for t in tables:
             table_name = t[0]
-            tmp_path = '{0}/{1}.txt'.format(tmp_folder, table_name)
-            path = '{0}/{1}.txt'.format(folder, table_name)
 
-            print('export table:{0}'.format(table_name))
-            self.execute_data(self.SQL_STRING['export_table'][0].format(
-                table=table_name,
-                filename=tmp_path
-            ))
+            db_dt = self.query_data(self.SQL_STRING['select_table'][0].format(
+                table=table_name
+            ), dict_cursor=True)
 
-            # 迁移数据
-            shutil.copy(tmp_path, path)
+            hd.delete('{0}.txt'.format(table_name), dir_path='/data')
+            hd.write_file(
+                '{0}.txt'.format(table_name),
+                db_dt,
+                '/data'
+            )
 
     def __del__(self):
         """
